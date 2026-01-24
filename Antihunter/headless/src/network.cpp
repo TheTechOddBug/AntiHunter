@@ -1042,6 +1042,7 @@ void processMeshMessage(const String &message) {
                     newAck.ackTimestamp = millis();
                     newAck.reportReceived = false;  // Will be set to true when data arrives
                     newAck.reportTimestamp = 0;
+                    newAck.lastHeartbeatTimestamp = millis();  // Initial heartbeat
                     triangulateAcks.push_back(newAck);
 
                     // Register node in reporting schedule to assign time slot
@@ -1053,6 +1054,31 @@ void processMeshMessage(const String &message) {
             }
         }
 
+        // Handle TRI_HEARTBEAT from child nodes
+        if (content == "TRI_HEARTBEAT") {
+            // Update last heartbeat timestamp for this node
+            std::lock_guard<std::mutex> lock(triangulationMutex);
+            bool found = false;
+            for (auto& ack : triangulateAcks) {
+                if (ack.nodeId == sendingNode) {
+                    found = true;
+                    ack.lastHeartbeatTimestamp = millis();
+                    break;
+                }
+            }
+            // If node not in ack list, add it (shouldn't happen but handle it)
+            if (!found && triangulationActive) {
+                TriangulateAckInfo newAck;
+                newAck.nodeId = sendingNode;
+                newAck.ackTimestamp = millis();
+                newAck.reportReceived = false;
+                newAck.reportTimestamp = 0;
+                newAck.lastHeartbeatTimestamp = millis();
+                triangulateAcks.push_back(newAck);
+                Serial.printf("[TRIANGULATE] Node %s added via heartbeat (%d total nodes)\n",
+                             sendingNode.c_str(), triangulateAcks.size());
+            }
+        }
     }
 
     // Process T_D messages during active triangulation OR while waiting for final reports

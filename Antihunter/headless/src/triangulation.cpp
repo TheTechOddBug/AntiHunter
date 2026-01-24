@@ -803,6 +803,15 @@ void stopTriangulation() {
                     Serial.println("[TRIANGULATE] WARNING: No reports yet after 2s");
                 }
 
+                // Check for silent nodes (no heartbeat in > 15 seconds)
+                uint32_t now = millis();
+                for (const auto &ack : triangulateAcks) {
+                    if (!ack.reportReceived && (now - ack.lastHeartbeatTimestamp > 15000)) {
+                        Serial.printf("[TRIANGULATE] WARNING: Node %s silent for %us (no heartbeat)\n",
+                                     ack.nodeId.c_str(), (now - ack.lastHeartbeatTimestamp) / 1000);
+                    }
+                }
+
                 // Yield more aggressively to prevent watchdog issues
                 vTaskDelay(pdMS_TO_TICKS(CHECK_INTERVAL));
             }
